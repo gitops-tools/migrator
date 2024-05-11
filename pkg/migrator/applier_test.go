@@ -1,10 +1,8 @@
 package migrator
 
 import (
-	"fmt"
 	"testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -14,36 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
-
-// ApplyPatches applies a set of "patches" to a resource.
-func ApplyPatches(obj *unstructured.Unstructured, patches []Patch) (*unstructured.Unstructured, error) {
-	for _, patch := range patches {
-		patch, err := jsonpatch.DecodePatch([]byte(patch.Change))
-		if err != nil {
-			// TODO
-			return nil, fmt.Errorf("decoding patch: %w", err)
-		}
-
-		b, err := obj.MarshalJSON()
-		if err != nil {
-			// TOOD
-			return nil, err
-		}
-
-		patched, err := patch.Apply(b)
-		if err != nil {
-			// TODO
-			return nil, err
-		}
-
-		if err := obj.UnmarshalJSON(patched); err != nil {
-			// TODO
-			return nil, err
-		}
-	}
-
-	return obj, nil
-}
 
 func TestApplyPatches(t *testing.T) {
 	cm := newConfigMap()
@@ -75,6 +43,53 @@ func TestApplyPatches(t *testing.T) {
 	if diff := cmp.Diff(want, updated); diff != "" {
 		t.Fatalf("failed to apply migrations:\n%s", diff)
 	}
+}
+
+func TestApplyPatches_invalid_patch(t *testing.T) {
+	cm := newConfigMap()
+
+	patches := []Patch{
+		{
+			Type:   "application/json-patch+json",
+			Change: `[{"op":"replace","path":"/data/testing","value":"new-value"}]`,
+		},
+	}
+
+	updated, err := ApplyPatches(toUnstructured(t, cm), patches)
+	assert.NoError(t, err)
+
+	want := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"data": map[string]any{
+				"testing": "new-value",
+			},
+			"kind": "ConfigMap",
+			"metadata": map[string]any{
+				"creationTimestamp": nil,
+				"name":              "test-cm",
+				"namespace":         "default",
+			},
+		},
+	}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Fatalf("failed to apply migrations:\n%s", diff)
+	}
+
+}
+
+func TestApplyPatches_fail_to_patch(t *testing.T) {
+	cm := newConfigMap()
+
+	patches := []Patch{
+		{
+			Type:   "application/json-patch+json",
+			Change: `[{"op":"replace","path":"/data/1/testing","value":"new-value"}]`,
+		},
+	}
+
+	_, err := ApplyPatches(toUnstructured(t, cm), patches)
+	assert.ErrorContains(t, err, "replace operation does not apply: doc is missing path")
 }
 
 func newFakeClient(objs ...runtime.Object) client.Client {
