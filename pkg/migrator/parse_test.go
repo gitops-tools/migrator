@@ -31,13 +31,13 @@ func TestParseMigrations(t *testing.T) {
 			Up: []Patch{
 				{
 					Type:   "application/json-patch+json",
-					Change: `{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceaccountpassword"}`,
+					Change: `[{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceaccountpassword"}]`,
 				},
 			},
 			Down: []Patch{
 				{
 					Type:   "application/json-patch+json",
-					Change: `{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceAccountPassword"}`,
+					Change: `[{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceAccountPassword"}]`,
 				},
 			},
 		},

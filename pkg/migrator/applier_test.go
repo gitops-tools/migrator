@@ -1,6 +1,7 @@
 package migrator
 
 import (
+	"fmt"
 	"testing"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -16,22 +17,32 @@ import (
 
 // ApplyPatches applies a set of "patches" to a resource.
 func ApplyPatches(obj *unstructured.Unstructured, patches []Patch) (*unstructured.Unstructured, error) {
-	updated := obj.DeepCopy()
 	for _, patch := range patches {
 		patch, err := jsonpatch.DecodePatch([]byte(patch.Change))
+		if err != nil {
+			// TODO
+			return nil, fmt.Errorf("decoding patch: %w", err)
+		}
+
+		b, err := obj.MarshalJSON()
+		if err != nil {
+			// TOOD
+			return nil, err
+		}
+
+		patched, err := patch.Apply(b)
 		if err != nil {
 			// TODO
 			return nil, err
 		}
 
-		patchedObject, err := patch.Apply(updated.Object)
-		if err != nil {
+		if err := obj.UnmarshalJSON(patched); err != nil {
 			// TODO
 			return nil, err
 		}
 	}
 
-	return updated, nil
+	return obj, nil
 }
 
 func TestApplyPatches(t *testing.T) {
@@ -40,7 +51,7 @@ func TestApplyPatches(t *testing.T) {
 	patches := []Patch{
 		{
 			Type:   "application/json-patch+json",
-			Change: `{"op":"replace","path":"/data/testing","value":"new-value"}`,
+			Change: `[{"op":"replace","path":"/data/testing","value":"new-value"}]`,
 		},
 	}
 
