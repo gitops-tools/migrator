@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	apitypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/kustomize/v3/pkg/types"
 	"sigs.k8s.io/yaml"
 )
@@ -14,11 +13,16 @@ import (
 // https://github.com/redhat-cop/patch-operator
 // https://pkg.go.dev/k8s.io/apimachinery/pkg/types#PatchType
 
+type Patch6902 struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
+
 // Patch provides a generic description of the change to be applied to a
 // resource.
 type Patch struct {
-	Type   apitypes.PatchType `json:"type,omitempty"`
-	Change string             `json:"change,omitempty"`
+	JSONPatches []Patch6902 `json:"jsonPatches,omitempty"`
 }
 
 // Migration describes a change that is applied to a resource.
@@ -26,8 +30,8 @@ type Migration struct {
 	Filename string
 	Name     string            `json:"name"`
 	Target   types.PatchTarget `json:"target"`
-	Up       []Patch           `json:"up"`
-	Down     []Patch           `json:"down,omitempty"`
+	Up       Patch             `json:"up"`
+	Down     Patch             `json:"down,omitempty"`
 }
 
 // ParseMigrations parses all the yaml files in the migration directory.

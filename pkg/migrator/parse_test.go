@@ -28,16 +28,22 @@ func TestParseMigrations(t *testing.T) {
 				Namespace: "",
 				Name:      "shibboleth",
 			},
-			Up: []Patch{
-				{
-					Type:   "application/json-patch+json",
-					Change: `[{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceaccountpassword"}]`,
+			Up: Patch{
+				JSONPatches: []Patch6902{
+					{
+						Op:    "replace,",
+						Path:  "/openLdapConfig/serviceAccountPassword",
+						Value: `cattle-global-data:shibbolethconfig-serviceaccountpassword"`,
+					},
 				},
 			},
-			Down: []Patch{
-				{
-					Type:   "application/json-patch+json",
-					Change: `[{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceAccountPassword"}]`,
+			Down: Patch{
+				JSONPatches: []Patch6902{
+					{
+						Op:    "replace,",
+						Path:  "/openLdapConfig/serviceAccountPassword",
+						Value: `cattle-global-data:shibbolethconfig-serviceAccountPassword"`,
+					},
 				},
 			},
 		},
