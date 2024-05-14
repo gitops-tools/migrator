@@ -1,0 +1,10 @@
+name: migrate-service
+target:
+  group: ""
+  version: v1
+  kind: Service
+  name: test-service
+  namespace: default
+up:
+  - change: '[{"op":"replace","path":"/spec/ports/0/targetPort","value":9371}]'
+    type: application/json-patch+json

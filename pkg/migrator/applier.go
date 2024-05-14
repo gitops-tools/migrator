@@ -3,7 +3,7 @@ package migrator
 import (
 	"fmt"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -11,13 +11,14 @@ import (
 //
 // A copy of the resource is returned with the patches applied.
 func ApplyPatches(obj *unstructured.Unstructured, patches []Patch) (*unstructured.Unstructured, error) {
+	objCopy := obj.DeepCopy()
 	for _, patch := range patches {
 		patch, err := jsonpatch.DecodePatch([]byte(patch.Change))
 		if err != nil {
 			return nil, fmt.Errorf("decoding patch: %w", err)
 		}
 
-		b, err := obj.MarshalJSON()
+		b, err := objCopy.MarshalJSON()
 		if err != nil {
 			return nil, fmt.Errorf("marshalling resource to JSON for patching: %s", err)
 		}
@@ -28,11 +29,11 @@ func ApplyPatches(obj *unstructured.Unstructured, patches []Patch) (*unstructure
 			return nil, err
 		}
 
-		if err := obj.UnmarshalJSON(patched); err != nil {
+		if err := objCopy.UnmarshalJSON(patched); err != nil {
 			// TODO
 			return nil, err
 		}
 	}
 
-	return obj, nil
+	return objCopy, nil
 }

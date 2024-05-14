@@ -1,0 +1,12 @@
+name: patch-broken-authconfig-secret-name
+target:
+  - group: management.cattle.io
+  version: v3
+  kind: AuthConfig
+  name: shibboleth
+up:
+  - change: '[{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceaccountpassword"}]'
+    type: application/json-patch+json
+down:
+  - change: '[{"op":"replace","path":"/openLdapConfig/serviceAccountPassword","value":"cattle-global-data:shibbolethconfig-serviceAccountPassword"}]'
+    type: application/json-patch+json

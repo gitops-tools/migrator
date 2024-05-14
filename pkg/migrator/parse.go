@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/v3/pkg/types"
 	"sigs.k8s.io/yaml"
 )
@@ -30,8 +32,25 @@ type Migration struct {
 	Down     []Patch           `json:"down,omitempty"`
 }
 
-// ParseMigrations parses all the yaml files in the migration directory.
-func ParseMigrations(dir string) ([]Migration, error) {
+// TargetGroupVersionKind returns the GVK for the Target as a GroupVersionKind.
+func (m Migration) TargetGroupVersionKind() schema.GroupVersionKind {
+	return schema.GroupVersionKind{
+		Group:   m.Target.Group,
+		Version: m.Target.Version,
+		Kind:    m.Target.Kind,
+	}
+}
+
+// TargetObjectKey returns the Key for loading the Target resource.
+func (m Migration) TargetObjectKey() client.ObjectKey {
+	return client.ObjectKey{
+		Name:      m.Target.Name,
+		Namespace: m.Target.Namespace,
+	}
+}
+
+// ParseDirectory parses all the yaml files in the migration directory.
+func ParseDirectory(dir string) ([]Migration, error) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
@@ -39,10 +58,10 @@ func ParseMigrations(dir string) ([]Migration, error) {
 
 	var migrations []Migration
 	for _, name := range filterYAMLFiles(files) {
-		migration, err := readYAML(filepath.Join(dir, name))
+		fullname := filepath.Join(dir, name)
+		migration, err := readYAML(fullname)
 		if err != nil {
-			// TODO
-			return nil, err
+			return nil, fmt.Errorf("parsing migration %s: %w", fullname, err)
 		}
 		migrations = append(migrations, *migration)
 	}
@@ -64,14 +83,12 @@ func filterYAMLFiles(entries []os.DirEntry) []string {
 func readYAML(filename string) (*Migration, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		// TODO: fix
 		return nil, err
 	}
 
 	var migration Migration
 	if err := yaml.Unmarshal(b, &migration); err != nil {
-		// TODO: fix
-		return nil, err
+		return nil, fmt.Errorf("parsing YAML: %w", err)
 	}
 
 	migration.Filename = filename
