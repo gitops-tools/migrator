@@ -8,10 +8,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Migrate executes the migrations.
-//
-// TODO: direction!
-func Migrate(ctx context.Context, kubeClient client.Client, migrations []Migration) error {
+// MigrateUp executes the migrations forward.
+func MigrateUp(ctx context.Context, kubeClient client.Client, migrations []Migration) error {
+	return migrate(ctx, kubeClient, migrations, func(m Migration) []Patch {
+		return m.Up
+	})
+}
+
+// MigrateUp executes the migrations down.
+func MigrateDown(ctx context.Context, kubeClient client.Client, migrations []Migration) error {
+	return migrate(ctx, kubeClient, migrations, func(m Migration) []Patch {
+		return m.Down
+	})
+}
+
+func migrate(ctx context.Context, kubeClient client.Client, migrations []Migration, f func(Migration) []Patch) error {
 	for _, migration := range migrations {
 		u := &unstructured.Unstructured{}
 		u.SetGroupVersionKind(migration.TargetGroupVersionKind())
@@ -20,7 +31,7 @@ func Migrate(ctx context.Context, kubeClient client.Client, migrations []Migrati
 			return fmt.Errorf("getting migration target %s %s: %w", u.GetKind(), migration.TargetObjectKey(), err)
 		}
 
-		updated, err := ApplyPatches(u, migration.Up)
+		updated, err := ApplyPatches(u, f(migration))
 		if err != nil {
 			return err
 		}

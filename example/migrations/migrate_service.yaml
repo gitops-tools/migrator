@@ -8,3 +8,6 @@ target:
 up:
   - change: '[{"op":"replace","path":"/spec/ports/0/targetPort","value":9371}]'
     type: application/json-patch+json
+down:
+  - change: '[{"op":"test","path":"/spec/ports/0/targetPort","value":9371},{"op":"replace","path":"/spec/ports/0/targetPort","value":9376}]'
+    type: application/json-patch+json

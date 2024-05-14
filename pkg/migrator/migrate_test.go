@@ -20,7 +20,7 @@ func TestMigrate_merge_patch(t *testing.T) {
 	t.Skip()
 }
 
-func TestMigrate(t *testing.T) {
+func TestMigrateUp(t *testing.T) {
 	migrations := []Migration{
 		{
 			Name:     "patch-service",
@@ -45,7 +45,7 @@ func TestMigrate(t *testing.T) {
 
 	fc := fake.NewClientBuilder().WithObjects(createService()).Build()
 
-	if err := Migrate(context.TODO(), fc, migrations); err != nil {
+	if err := MigrateUp(context.TODO(), fc, migrations); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,7 +66,7 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
-func TestMigrate_missing_resource(t *testing.T) {
+func TestMigrateUp_missing_resource(t *testing.T) {
 	migrations := []Migration{
 		{
 			Name:     "patch-service",
@@ -91,11 +91,11 @@ func TestMigrate_missing_resource(t *testing.T) {
 
 	fc := fake.NewClientBuilder().Build()
 
-	err := Migrate(context.TODO(), fc, migrations)
+	err := MigrateUp(context.TODO(), fc, migrations)
 	assert.ErrorContains(t, err, "getting migration target Service default/testing: services \"testing\" not found")
 }
 
-func TestMigrate_bad_resource(t *testing.T) {
+func TestMigrateUp_bad_resource(t *testing.T) {
 	migrations := []Migration{
 		{
 			Name:     "patch-service",
@@ -120,8 +120,64 @@ func TestMigrate_bad_resource(t *testing.T) {
 
 	fc := fake.NewClientBuilder().WithObjects(createService()).Build()
 
-	err := Migrate(context.TODO(), fc, migrations)
+	err := MigrateUp(context.TODO(), fc, migrations)
 	assert.ErrorContains(t, err, "replace operation does not apply: doc is missing path: /spec/sports/0/port")
+}
+
+func TestMigrateDown(t *testing.T) {
+	migrations := []Migration{
+		{
+			Name:     "patch-service",
+			Filename: "testdata/simple.yaml",
+			Target: types.PatchTarget{
+				Gvk: gvk.Gvk{
+					Group:   "",
+					Version: "v1",
+					Kind:    "Service",
+				},
+				Namespace: "default",
+				Name:      "testing",
+			},
+			Up: []Patch{
+				{
+					Type:   "application/json-patch+json",
+					Change: `[{"op":"replace","path":"/spec/ports/0/port","value":81}]`,
+				},
+			},
+			Down: []Patch{
+				{
+					Type:   "application/json-patch+json",
+					Change: `[{"op":"replace","path":"/spec/ports/0/port","value":80}]`,
+				},
+			},
+		},
+	}
+
+	fc := fake.NewClientBuilder().WithObjects(createService()).Build()
+
+	if err := MigrateUp(context.TODO(), fc, migrations); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MigrateDown(context.TODO(), fc, migrations); err != nil {
+		t.Fatal(err)
+	}
+
+	var svc corev1.Service
+	if err := fc.Get(context.TODO(), client.ObjectKey{Name: "testing", Namespace: "default"}, &svc); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []corev1.ServicePort{
+		{
+			Protocol:   "TCP",
+			Port:       80,
+			TargetPort: intstr.FromInt(9376),
+		},
+	}
+	if diff := cmp.Diff(want, svc.Spec.Ports); diff != "" {
+		t.Errorf("failed to migrate:\n%s", diff)
+	}
 }
 
 func createService() *corev1.Service {
