@@ -12,3 +12,5 @@ See the [example](./example).
  - [ ] structured patch declarations (rather than parsing JSON strings)
  - [ ] storage of current "migration level" somewhere so that we can skip previously applied migrations.
  - [ ] storage of previous version to allow a better reversion (rather than _down_)
+ - [ ] Apply to _all_ matching resources for the Patch Target
+ - [ ] Figure out how to apply migrations to files in a directory (for GitOps use-cases) 
