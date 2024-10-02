@@ -22,7 +22,6 @@ func TestMigrateUp(t *testing.T) {
 		want       []corev1.ServicePort
 	}{
 		{
-
 			name: "json-patch",
 			migrations: []Migration{
 				{
@@ -55,7 +54,6 @@ func TestMigrateUp(t *testing.T) {
 			},
 		},
 		{
-
 			name: "merge-patch",
 			migrations: []Migration{
 				{
