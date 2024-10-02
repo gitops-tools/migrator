@@ -6,6 +6,7 @@ import (
 	"sigs.k8s.io/kustomize/v3/pkg/gvk"
 	"sigs.k8s.io/kustomize/v3/pkg/types"
 
+	"github.com/bigkevmcd/migrator/pkg/migrator/celpatch"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
@@ -113,6 +114,43 @@ func TestParseDirectory_name_ordering(t *testing.T) {
 		"testdata/ordered/03_patch_secret_name.yaml",
 	}
 	if diff := cmp.Diff(want, migrationNames); diff != "" {
+		t.Fatalf("failed to parse migrations:\n%s", diff)
+	}
+}
+
+func TestParseDirectory_cel_migration(t *testing.T) {
+	migrations, err := ParseDirectory("testdata/celmigration")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []Migration{
+		{
+			Filename: "testdata/celmigration/migrate_service.yaml",
+			Name:     "cel-migrate-service",
+			Target: types.PatchTarget{
+				Gvk: gvk.Gvk{
+					Group:   "",
+					Version: "v1",
+					Kind:    "Service",
+				},
+				Namespace: "default",
+				Name:      "test-service",
+			},
+			Up: []Patch{
+				{
+					Type: "application/migrate-cel-patch",
+					CEL: []celpatch.Change{
+						{
+							Key:      "spec.ports.0.port",
+							NewValue: "81",
+						},
+					},
+				},
+			},
+		},
+	}
+	if diff := cmp.Diff(want, migrations); diff != "" {
 		t.Fatalf("failed to parse migrations:\n%s", diff)
 	}
 }

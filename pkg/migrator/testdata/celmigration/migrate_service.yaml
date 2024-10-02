@@ -1,0 +1,12 @@
+name: cel-migrate-service
+target:
+  group: ""
+  version: v1
+  kind: Service
+  name: test-service
+  namespace: default
+up:
+  - type: application/migrate-cel-patch
+    cel:
+      - key: spec.ports.0.port
+        newValue: "81"

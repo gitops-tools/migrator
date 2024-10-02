@@ -3,6 +3,7 @@ package migrator
 import (
 	"testing"
 
+	"github.com/bigkevmcd/migrator/pkg/migrator/celpatch"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -76,7 +77,6 @@ func TestApplyPatches_invalid_patch(t *testing.T) {
 	if diff := cmp.Diff(want, updated); diff != "" {
 		t.Fatalf("failed to apply migrations:\n%s", diff)
 	}
-
 }
 
 func TestApplyPatches_fail_to_patch(t *testing.T) {
@@ -126,6 +126,43 @@ func TestApplyPatches_merge_patch(t *testing.T) {
 				},
 			},
 			"status": map[string]any{"loadBalancer": map[string]any{}},
+		},
+	}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Fatalf("failed to apply migrations:\n%s", diff)
+	}
+}
+
+func TestApplyPatches_cel_migration(t *testing.T) {
+	cm := newConfigMap()
+
+	patches := []Patch{
+		{
+			Type: "application/migrate-cel-patch",
+			CEL: []celpatch.Change{
+				{
+					Key:      "data.testing",
+					NewValue: "'this is migrated'",
+				},
+			},
+		},
+	}
+
+	updated, err := ApplyPatches(toUnstructured(t, cm), patches)
+	assert.NoError(t, err)
+
+	want := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"data": map[string]any{
+				"testing": "this is migrated",
+			},
+			"kind": "ConfigMap",
+			"metadata": map[string]any{
+				"creationTimestamp": nil,
+				"name":              "test-cm",
+				"namespace":         "default",
+			},
 		},
 	}
 	if diff := cmp.Diff(want, updated); diff != "" {

@@ -3,13 +3,15 @@ package migrator
 import (
 	"fmt"
 
+	"github.com/bigkevmcd/migrator/pkg/migrator/celpatch"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	mergePatchType = "application/merge-patch+json"
-	jsonPatchType  = "application/json-patch+json"
+	mergePatchType   = "application/merge-patch+json"
+	jsonPatchType    = "application/json-patch+json"
+	celMigrationType = "application/migrate-cel-patch"
 )
 
 // ApplyPatches applies a set of "patches" to a resource.
@@ -30,6 +32,12 @@ func ApplyPatches(obj *unstructured.Unstructured, patches []Patch) (*unstructure
 			if err != nil {
 				return nil, err
 			}
+		case celMigrationType:
+			objCopy, err = applyCELPatch(objCopy, patch.CEL)
+			if err != nil {
+				return nil, err
+			}
+
 		default:
 			return nil, fmt.Errorf("unknown patch type: %s", patch.Type)
 		}
@@ -52,6 +60,12 @@ func applyJSONPatch(obj *unstructured.Unstructured, change string) (*unstructure
 func applyMergePatch(obj *unstructured.Unstructured, change string) (*unstructured.Unstructured, error) {
 	return applyPatch(obj, func(b []byte) ([]byte, error) {
 		return jsonpatch.MergePatch(b, []byte(change))
+	})
+}
+
+func applyCELPatch(obj *unstructured.Unstructured, changes []celpatch.Change) (*unstructured.Unstructured, error) {
+	return applyPatch(obj, func(b []byte) ([]byte, error) {
+		return celpatch.ApplyChanges(b, changes)
 	})
 }
 

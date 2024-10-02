@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bigkevmcd/migrator/pkg/migrator/celpatch"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +22,7 @@ import (
 type Patch struct {
 	Type   apitypes.PatchType `json:"type,omitempty"`
 	Change string             `json:"change,omitempty"`
+	CEL    []celpatch.Change  `json:"cel,omitempty"`
 }
 
 // Migration describes a change that is applied to a resource.
