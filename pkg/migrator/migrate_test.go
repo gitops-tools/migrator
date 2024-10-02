@@ -15,54 +15,98 @@ import (
 	"sigs.k8s.io/kustomize/v3/pkg/types"
 )
 
-func TestMigrate_merge_patch(t *testing.T) {
-	// TODO: parse the Type and use a different type for merge patches!
-	t.Skip()
-}
-
 func TestMigrateUp(t *testing.T) {
-	migrations := []Migration{
+	migrationTests := []struct {
+		name       string
+		migrations []Migration
+		want       []corev1.ServicePort
+	}{
 		{
-			Name:     "patch-service",
-			Filename: "testdata/simple.yaml",
-			Target: types.PatchTarget{
-				Gvk: gvk.Gvk{
-					Group:   "",
-					Version: "v1",
-					Kind:    "Service",
-				},
-				Namespace: "default",
-				Name:      "testing",
-			},
-			Up: []Patch{
+
+			name: "json-patch",
+			migrations: []Migration{
 				{
-					Type:   "application/json-patch+json",
-					Change: `[{"op":"replace","path":"/spec/ports/0/port","value":81}]`,
+					Name:     "patch-service",
+					Filename: "testdata/simple.yaml",
+					Target: types.PatchTarget{
+						Gvk: gvk.Gvk{
+							Group:   "",
+							Version: "v1",
+							Kind:    "Service",
+						},
+						Namespace: "default",
+						Name:      "test-svc",
+					},
+					Up: []Patch{
+						{
+							Type:   "application/json-patch+json",
+							Change: `[{"op":"replace","path":"/spec/ports/0/port","value":81}]`,
+						},
+					},
+				},
+			},
+			want: []corev1.ServicePort{
+				{
+					Protocol:   "TCP",
+					Name:       "http-80",
+					Port:       81,
+					TargetPort: intstr.FromInt(9376),
+				},
+			},
+		},
+		{
+
+			name: "merge-patch",
+			migrations: []Migration{
+				{
+					Name:     "patch-service",
+					Filename: "testdata/simple.yaml",
+					Target: types.PatchTarget{
+						Gvk: gvk.Gvk{
+							Group:   "",
+							Version: "v1",
+							Kind:    "Service",
+						},
+						Namespace: "default",
+						Name:      "test-svc",
+					},
+					Up: []Patch{
+						{
+							Type:   "application/merge-patch+json",
+							Change: `{"spec":{"ports":[{"name":"http","port":80,"protocol":"TCP","targetPort":82}]}}`,
+						},
+					},
+				},
+			},
+			want: []corev1.ServicePort{
+				{
+					Protocol:   "TCP",
+					Name:       "http",
+					Port:       80,
+					TargetPort: intstr.FromInt(82),
 				},
 			},
 		},
 	}
 
-	fc := fake.NewClientBuilder().WithObjects(createService()).Build()
+	for _, tt := range migrationTests {
+		t.Run(tt.name, func(t *testing.T) {
+			fc := fake.NewClientBuilder().WithObjects(newService()).Build()
 
-	if err := MigrateUp(context.TODO(), fc, migrations); err != nil {
-		t.Fatal(err)
-	}
+			if err := MigrateUp(context.TODO(), fc, tt.migrations); err != nil {
+				t.Fatal(err)
+			}
 
-	var svc corev1.Service
-	if err := fc.Get(context.TODO(), client.ObjectKey{Name: "testing", Namespace: "default"}, &svc); err != nil {
-		t.Fatal(err)
-	}
+			var svc corev1.Service
+			if err := fc.Get(context.TODO(), client.ObjectKey{
+				Name: "test-svc", Namespace: "default"}, &svc); err != nil {
+				t.Fatal(err)
+			}
 
-	want := []corev1.ServicePort{
-		{
-			Protocol:   "TCP",
-			Port:       81,
-			TargetPort: intstr.FromInt(9376),
-		},
-	}
-	if diff := cmp.Diff(want, svc.Spec.Ports); diff != "" {
-		t.Errorf("failed to migrate:\n%s", diff)
+			if diff := cmp.Diff(tt.want, svc.Spec.Ports); diff != "" {
+				t.Errorf("failed to migrate:\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -107,7 +151,7 @@ func TestMigrateUp_bad_resource(t *testing.T) {
 					Kind:    "Service",
 				},
 				Namespace: "default",
-				Name:      "testing",
+				Name:      "test-svc",
 			},
 			Up: []Patch{
 				{
@@ -118,7 +162,7 @@ func TestMigrateUp_bad_resource(t *testing.T) {
 		},
 	}
 
-	fc := fake.NewClientBuilder().WithObjects(createService()).Build()
+	fc := fake.NewClientBuilder().WithObjects(newService()).Build()
 
 	err := MigrateUp(context.TODO(), fc, migrations)
 	assert.ErrorContains(t, err, "replace operation does not apply: doc is missing path: /spec/sports/0/port")
@@ -136,7 +180,7 @@ func TestMigrateDown(t *testing.T) {
 					Kind:    "Service",
 				},
 				Namespace: "default",
-				Name:      "testing",
+				Name:      "test-svc",
 			},
 			Up: []Patch{
 				{
@@ -153,7 +197,7 @@ func TestMigrateDown(t *testing.T) {
 		},
 	}
 
-	fc := fake.NewClientBuilder().WithObjects(createService()).Build()
+	fc := fake.NewClientBuilder().WithObjects(newService()).Build()
 
 	if err := MigrateUp(context.TODO(), fc, migrations); err != nil {
 		t.Fatal(err)
@@ -164,7 +208,7 @@ func TestMigrateDown(t *testing.T) {
 	}
 
 	var svc corev1.Service
-	if err := fc.Get(context.TODO(), client.ObjectKey{Name: "testing", Namespace: "default"}, &svc); err != nil {
+	if err := fc.Get(context.TODO(), client.ObjectKey{Name: "test-svc", Namespace: "default"}, &svc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -172,6 +216,7 @@ func TestMigrateDown(t *testing.T) {
 		{
 			Protocol:   "TCP",
 			Port:       80,
+			Name:       "http-80",
 			TargetPort: intstr.FromInt(9376),
 		},
 	}

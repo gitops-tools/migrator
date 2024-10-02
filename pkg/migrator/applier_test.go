@@ -9,11 +9,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestApplyPatches(t *testing.T) {
+func TestApplyPatches_json_patch(t *testing.T) {
 	cm := newConfigMap()
 
 	patches := []Patch{
@@ -92,6 +93,46 @@ func TestApplyPatches_fail_to_patch(t *testing.T) {
 	assert.ErrorContains(t, err, "replace operation does not apply: doc is missing path")
 }
 
+func TestApplyPatches_merge_patch(t *testing.T) {
+	svc := newService()
+
+	patches := []Patch{
+		{
+			Type:   "application/merge-patch+json",
+			Change: `{"spec":{"ports":[{"name":"http-80","port":80,"protocol":"TCP","targetPort":9080}]}}`,
+		},
+	}
+
+	updated, err := ApplyPatches(toUnstructured(t, svc), patches)
+	assert.NoError(t, err)
+
+	want := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]any{
+				"creationTimestamp": nil,
+				"name":              "test-svc",
+				"namespace":         "default",
+			},
+			"spec": map[string]any{
+				"ports": []any{
+					map[string]any{
+						"name":       string("http-80"),
+						"port":       int64(80),
+						"protocol":   string("TCP"),
+						"targetPort": int64(9080),
+					},
+				},
+			},
+			"status": map[string]any{"loadBalancer": map[string]any{}},
+		},
+	}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Fatalf("failed to apply migrations:\n%s", diff)
+	}
+}
+
 func newFakeClient(objs ...runtime.Object) client.Client {
 	return fake.NewClientBuilder().
 		WithRuntimeObjects(objs...).
@@ -118,6 +159,34 @@ func newConfigMap(opts ...func(*corev1.ConfigMap)) *corev1.ConfigMap {
 	}
 
 	return cm
+}
+
+func newService(opts ...func(*corev1.Service)) *corev1.Service {
+	svc := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-svc",
+			Namespace: "default",
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "http-80",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       80,
+					TargetPort: intstr.FromInt(9376)},
+			},
+		},
+	}
+
+	for _, o := range opts {
+		o(svc)
+	}
+
+	return svc
 }
 
 func toUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
