@@ -33,8 +33,8 @@ func (l *demoLib) CompileOptions() []cel.EnvOption {
 	mapStrDyn := cel.MapType(cel.StringType, cel.DynType)
 
 	opts := []cel.EnvOption{
-		cel.Function("ldap_lookup",
-			cel.Overload("ldap_lookup_string", []*cel.Type{cel.StringType}, mapStrDyn, cel.UnaryBinding(makeLDAPLookup(l)))),
+		cel.Function("ldap.lookup",
+			cel.Overload("ldap.lookup_string", []*cel.Type{cel.StringType}, mapStrDyn, cel.UnaryBinding(makeLDAPLookup(l)))),
 	}
 
 	return opts

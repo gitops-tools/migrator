@@ -30,7 +30,7 @@ func TestApplyChanges(t *testing.T) {
 		},
 		{
 			Key:      "data.personID",
-			NewValue: "ldap_lookup('testuser@example.com').guid",
+			NewValue: "ldap.lookup('testuser@example.com').guid",
 		},
 	}
 
@@ -52,6 +52,89 @@ func TestApplyChanges(t *testing.T) {
 				"creationTimestamp": nil,
 				"name":              "test-cm",
 				"namespace":         "default",
+			},
+		},
+	}
+
+	obj := &unstructured.Unstructured{}
+	if err := obj.UnmarshalJSON(updated); err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(want, obj); diff != "" {
+		t.Fatalf("failed to apply migrations:\n%s", diff)
+	}
+}
+
+func TestApplyChanges_migrate_user(t *testing.T) {
+	user := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion":  "management.cattle.io/v3",
+			"description": "",
+			"displayName": "System account for Cluster local",
+			"kind":        "User",
+			"metadata": map[string]any{
+				"annotations": map[string]any{
+					"authz.management.cattle.io/creator-role-bindings":      "{\"created\":[\"user\"],\"required\":[\"user\"]}",
+					"lifecycle.cattle.io/create.mgmt-auth-users-controller": "true",
+				},
+				"creationTimestamp": "2024-10-02T09:30:38Z",
+				"finalizers": []any{
+					"controller.cattle.io/mgmt-auth-users-controller",
+				},
+				"generation": int64(3),
+				"labels": map[string]any{
+					"EDSN6T35DKT2UBRCDTHM2R0": "hashed-principal-name",
+					"cattle.io/creator":       "norman",
+				},
+				"name":            "u-b4qkhsnliz",
+				"resourceVersion": "3201",
+				"uid":             "87b1367e-b440-4dda-801b-662209926c6d",
+			},
+			"principalIds": []string{
+				"system://local",
+				"ldap_user://cn=test,dc=example,dc=com",
+			},
+		},
+	}
+
+	changes := []Change{
+		{
+			Key:      "principalIds.1",
+			NewValue: "'this is a test'",
+		},
+	}
+
+	updated, err := ApplyChanges(testMarshalToJSON(t, user), changes, WithCELLib(ext.Demo()))
+	assert.NoError(t, err)
+
+	want := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion":  "management.cattle.io/v3",
+			"description": "",
+			"displayName": "System account for Cluster local",
+			"kind":        "User",
+			"metadata": map[string]any{
+				"annotations": map[string]any{
+					"authz.management.cattle.io/creator-role-bindings":      "{\"created\":[\"user\"],\"required\":[\"user\"]}",
+					"lifecycle.cattle.io/create.mgmt-auth-users-controller": "true",
+				},
+				"creationTimestamp": "2024-10-02T09:30:38Z",
+				"finalizers": []any{
+					"controller.cattle.io/mgmt-auth-users-controller",
+				},
+				"generation": int64(3),
+				"labels": map[string]any{
+					"EDSN6T35DKT2UBRCDTHM2R0": "hashed-principal-name",
+					"cattle.io/creator":       "norman",
+				},
+				"name":            "u-b4qkhsnliz",
+				"resourceVersion": "3201",
+				"uid":             "87b1367e-b440-4dda-801b-662209926c6d",
+			},
+			"principalIds": []string{
+				"system://local",
+				"local://u-b4qkhsnliz",
 			},
 		},
 	}
