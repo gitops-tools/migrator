@@ -68,7 +68,7 @@ func TestMigrateChanges(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if diff := cmp.Diff(changes, tt.want); diff != "" {
+			if diff := cmp.Diff(tt.want, changes); diff != "" {
 				t.Fatalf("failed to calculate changes:\n%s", diff)
 			}
 		})

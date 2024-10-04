@@ -1,4 +1,4 @@
-package migrator
+package calculate
 
 import (
 	"context"
@@ -22,35 +22,10 @@ type MigrationChange struct {
 	Patch PatchedResource
 }
 
-// CalculateChanges takes a set of migrations and returns the changes
-// that would be applied.
-// TODO: Migrate from Kustomize gvk.Gvk
-func CalculateChanges(ctx context.Context, kubeClient client.Reader, migrations []Migration) ([]MigrationChange, error) {
-	var changes []MigrationChange
-
-	for _, migration := range migrations {
-		toMigrate, err := resourcesToMigrate(ctx, kubeClient, migration)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, resource := range toMigrate {
-			updated, err := ApplyPatches(&resource, migration.Up)
-			if err != nil {
-				return nil, err
-			}
-
-			change, err := unstructuredDiff(*updated, resource)
-			if err != nil {
-				return nil, err // TODO
-			}
-			changes = append(changes, MigrationChange{
-				patchedResource(&resource, change),
-			})
-		}
-	}
-
-	return changes, nil
+// Migration is an interface describing how to make changes.
+type Migration interface {
+	// TODO Add options for batching?
+	Migrate(context.Context, client.Reader) ([]*MigrationChange, error)
 }
 
 func patchedResource(obj client.Object, patch string) PatchedResource {
