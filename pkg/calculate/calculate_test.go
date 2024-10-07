@@ -44,7 +44,7 @@ func TestMigrateChanges(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fc := fake.NewClientBuilder().WithObjects(newService()).Build()
 
-			changes, err := tt.migration.Migrate(context.TODO(), fc)
+			changes, err := Calculate(context.TODO(), fc, tt.migration)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -62,9 +62,9 @@ type testMigrator struct {
 // This should have a MigrationOptions with batch size etc.
 // We need to be careful here restarting the query with a batch-size could
 // result in the the same X items being returned and never progressing the
-// batch.
+// migration.
 
-func (m testMigrator) Migrate(ctx context.Context, reader client.Reader) ([]*MigrationChange, error) {
+func (m testMigrator) Resources(ctx context.Context, k8sClient client.Reader) ([]unstructured.Unstructured, error) {
 	ul := unstructured.UnstructuredList{}
 	ul.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "",
@@ -72,27 +72,25 @@ func (m testMigrator) Migrate(ctx context.Context, reader client.Reader) ([]*Mig
 		Kind:    "Service",
 	})
 
-	if err := reader.List(ctx, &ul); err != nil {
+	if err := k8sClient.List(ctx, &ul); err != nil {
 		return nil, err
 	}
 
-	var changes []*MigrationChange
-	for _, original := range ul.Items {
-		change, err := createChange(original, func(updated *unstructured.Unstructured) error {
-			return unstructured.SetNestedMap(updated.UnstructuredContent(), map[string]any{"app": "test"}, "spec", "selector")
-		})
-		// TODO: multi-error!
-		if err != nil {
-			return nil, err
-		}
-
-		changes = append(changes, change)
-	}
-
-	return changes, nil
+	return ul.Items, nil
 }
 
-func createChange(original unstructured.Unstructured, f func(*unstructured.Unstructured) error) (*MigrationChange, error) {
+func (m testMigrator) Migrate(ctx context.Context, original unstructured.Unstructured) ([]*MigrationChange, error) {
+	change, err := createChange(original, func(updated *unstructured.Unstructured) error {
+		return unstructured.SetNestedMap(updated.UnstructuredContent(), map[string]any{"app": "test"}, "spec", "selector")
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return []*MigrationChange{change}, nil
+}
+
+func createChange(original unstructured.Unstructured, f func(updated *unstructured.Unstructured) error) (*MigrationChange, error) {
 	updated := original.DeepCopy()
 
 	if err := f(updated); err != nil {
